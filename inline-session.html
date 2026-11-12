@@ -97,6 +97,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
       // XR globals.
       let xrButton = null;
+      let xrButtonNeu = null;
+
       let xrImmersiveRefSpace = null;
       let xrInlineRefSpace = null;
 
@@ -106,7 +108,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
       let scene = new Scene();
       let solarSystem = new Gltf2Node({url: 'media/gltf/space/space.gltf'});
       scene.addNode(solarSystem);
-      scene.addNode(new SkyboxNode({url: 'media/textures/milky-way-4k.png'}));
+      //scene.addNode(new SkyboxNode({url: 'media/textures/milky-way-4k.png'}));
+      let skybox = new SkyboxNode({url: 'media/textures/milky-way-4k.png'});
+      scene.addNode(skybox);
+      let arStartedNeu;
 
       function initXR() {
 		 console.log("wir sind in initXR");
@@ -115,6 +120,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
           onEndSession: onEndSession
         });
         document.querySelector('header').appendChild(xrButton.domElement);
+        
+        xrButtonNeu = new WebXRButton({
+          onRequestSession: onRequestSessionNeu,
+          onEndSession: onEndSession,
+          textEnterXRTitle: "START AR",
+          textXRNotFoundTitle: "AR NOT FOUND",
+          textExitXRTitle: "EXIT  AR",
+        });
+        document.querySelector('header').appendChild(xrButtonNeu.domElement);
+
+        navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+          xrButtonNeu.enabled = supported;
+        });
+
+        arStartedNeu = false;
+
+
 
         if (navigator.xr) {
           navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
@@ -140,6 +162,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
           onSessionStarted(session);
         });
       }
+
+
+      function onRequestSessionNeu() {
+        return navigator.xr.requestSession('immersive-ar').then((session) => {
+          xrButtonNeu.setSession(session);
+          session.isImmersive = true;
+          arStartedNeu = true;
+          onSessionStarted(session);
+        });
+      }
+
 
       function onSessionStarted(session) {
         session.addEventListener('end', onSessionEnded);
@@ -189,8 +222,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
           // which XRReferenceSpace is associated with which XRSession.
           if (session.isImmersive) {
             xrImmersiveRefSpace = refSpace;
+            xrImmersiveRefSpace.addEventListener('reset', (evt) => {
+              if (evt.transform) {
+                xrImmersiveRefSpace = xrImmersiveRefSpace.getOffsetReferenceSpace(evt.transform);
+              }
+            });
           } else {
             xrInlineRefSpace = refSpace;
+          }
+          if (session.isImmersive && arStartedNeu) {
+            skybox.visible = false;
           }
           session.requestAnimationFrame(onXRFrame);
         });
@@ -204,8 +245,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         // Only reset the button when the immersive session ends.
         if (event.session.isImmersive) {
           xrButton.setSession(null);
+          xrButtonNeu.setSession(null);
+          skybox.visible = true;
+          arStartedNeu = false;
         }
       }
+
 
       // Called every time a XRSession requests that a new frame be drawn.
       function onXRFrame(t, frame) {
